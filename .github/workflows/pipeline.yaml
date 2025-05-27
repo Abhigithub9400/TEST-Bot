@@ -14,5 +14,11 @@ jobs:
       - name: Docker Build
         run: |
           docker build -t my-app .
+       - name: Docker Build
+        run: |
+          docker tag my-app myapp:latest 
+
       - name: Aqua Security Trivy 
         uses: aquasecurity/trivy-action@0.30.0
+        with:
+           image-ref: my-app:latest
