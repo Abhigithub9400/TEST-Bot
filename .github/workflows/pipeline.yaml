@@ -3,7 +3,7 @@ name: Build and Deploy to Minikube
 on:
   push:
     branches:
-      - test # Trigger deployment when changes are pushed to the main branch
+      - test # Trigger deployment when changes are pushed to the test branch
   workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
 
 jobs:
@@ -35,15 +35,15 @@ jobs:
       # Step 5: Set up Minikube kubectl context
       - name: Set up Minikube kubectl context
         run: |
-          echo ${{ secrets.KUBE_CONFIG }} | base64 --decode > ~/.kube/config  # Use kubeconfig from GitHub secret
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config  # Decode kubeconfig and save to the kubeconfig file
           kubectl config use-context minikube  # Ensure kubectl points to the Minikube context
 
       # Step 6: Deploy to Minikube using the Kubernetes manifest file
       - name: Deploy to Minikube
         run: |
           kubectl apply -f minikube/k8manifest.yaml  # Apply the deployment and service manifest
-          
-      # # Optional Step: Expose the app locally if you need to test it
+
+      # Optional Step: Expose the app locally if you need to test it
       # - name: Expose app via port-forwarding
       #   run: |
       #     kubectl port-forward service/my-app-service 8080:80 &  # Forward port 80 to localhost:8080
