@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: $(namespace)
+  name: $(proj_branch)
+  labels:
+    app: $(proj_branch)
+spec:
+  ports:
+    - name: $(proj_port)
+      port: 80
+      protocol: TCP
+  selector:
+    app: $(proj_branch)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: $(namespace)
+  labels:
+    app: $(proj_branch)
+  name: $(proj_branch)
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: $(proj_branch)
+  template:
+    metadata:
+      labels:
+        app: $(proj_branch)
+    spec:
+      containers:
+        - image: docker-registry.dev.displayme.net/$(dockerrepo)
+          imagePullPolicy: IfNotPresent
+          name: $(proj_branch)
+          env: 
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Dev"
+            # Azure Key Vault Authentication - ADD THESE LINES
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-keyvault-secret
+                  key: AZURE_TENANT_ID
+            - name: AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-keyvault-secret
+                  key: AZURE_CLIENT_ID
+            - name: AZURE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: azure-keyvault-secret
+                  key: AZURE_CLIENT_SECRET
+            - name: AZURE_KEYVAULT_URL
+              valueFrom:
+                secretKeyRef:
+                  name: azure-keyvault-secret
+                  key: AZURE_KEYVAULT_URL
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: $(namespace)
+  name: $(proj_branch)
+spec:
+  rules:
+  - host: $(site_url)
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: $(proj_branch)
+            port:
+              name: $(proj_port)

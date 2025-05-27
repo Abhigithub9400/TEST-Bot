@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.69.0" />
+    <PackageReference Include="Mapster" Version="7.4.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Serilog" Version="4.2.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.MSSqlServer" Version="8.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MediAssist.Application.Abstract\MediAssist.Application.Abstract.csproj" />
+    <ProjectReference Include="..\MediAssist.Configurations\MediAssist.Configurations.csproj" />
+    <ProjectReference Include="..\MediAssist.Infrastructure.Abstract\MediAssist.Infrastructure.Abstract.csproj" />
+    <ProjectReference Include="..\MediAssist.Infrastructure.Extensions\MediAssist.Infrastructure.Extensions.csproj" />
+    <ProjectReference Include="..\MediAssist.Infrastructure.HttpProvider\MediAssist.Infrastructure.HttpProvider.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,156 @@
+trigger: 
+ branches:
+   include:
+     - development
+      
+pool:
+  name: 'MEDI'
+ 
+variables:
+- group: api.develop
+- name: variableConfiguration
+  value: ''
+- name: solution
+  value: '**/*.sln'
+- name: buildPlatform
+  value: 'Any CPU'
+- name: buildConfiguration
+  value: 'Release'
+ 
+stages:
+- stage: "Parallel_Execution"
+  jobs:
+  - job: Scanning
+    displayName: SonarQube
+    pool:
+      name: 'MEDI'
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 5
+    steps:
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet packages'
+      inputs:
+        command: 'restore'
+        projects: '**/*.csproj'
+        
+    - task: DotNetCoreCLI@2
+      displayName: 'Run Tests with Coverage'
+      inputs:
+        command: 'test'
+        projects: '**/*[Tt]est*/*.csproj'
+        arguments: '--configuration $(buildConfiguration) /p:CollectCoverage=true /p:CoverletOutputFormat="\"cobertura,opencover\"" /p:Threshold=0 --logger trx --results-directory "$(Agent.TempDirectory)/TestResults" --collect:"XPlat Code Coverage"'
+        publishTestResults: false
+      continueOnError: false
+ 
+    # - task: PublishTestResults@2
+    #   displayName: 'Publish Test Results'
+    #   condition: succeededOrFailed()
+    #   inputs:
+    #     testRunner: 'VSTest'
+    #     testResultsFiles: '$(Agent.TempDirectory)/TestResults/*.trx'
+    #     searchFolder: '$(Agent.TempDirectory)/TestResults'
+    #     mergeTestResults: true
+    #     failTaskOnFailedTests: false
+    #     testRunTitle: '.NET Test Results'
+ 
+    # - task: PublishCodeCoverageResults@1
+    #   displayName: 'Publish Code Coverage'
+    #   inputs:
+    #     codeCoverageTool: 'Cobertura'
+    #     summaryFileLocation: '$(Build.SourcesDirectory)/**/coverage.cobertura.xml'
+    #     reportDirectory: '$(Build.SourcesDirectory)/**/TestResults/Coverage'
+    #     failIfCoverageEmpty: true
+ 
+    # - task: SonarQubePrepare@4
+    #   displayName: "Prepare analysis on SonarQube"
+    #   inputs:
+    #     SonarQube: 'Sonarqube-API'
+    #     scannerMode: 'MSBuild'
+    #     projectKey: 'MEDI-FE'
+    #     projectName: 'MEDI-FE'
+    #     extraProperties: |
+    #       sonar.cs.vstest.reportsPaths=$(Agent.TempDirectory)/TestResults/**/*.trx
+    #       sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/**/coverage.opencover.xml
+    #       sonar.cs.cobertura.reportsPaths=$(Build.SourcesDirectory)/**/coverage.cobertura.xml
+    #       sonar.branch.name=$(Build.SourceBranchName)
+    #       sonar.projectVersion=1.0
+    #       sonar.sourceEncoding=UTF-8
+    #       sonar.exclusions=**/obj/**,**/*.dll
+    #       sonar.coverage.exclusions=**/*Tests*.cs,**/Migrations/**,**/Startup.cs,**/Program.cs,**/ClientApp/**,**/MediAssist.Configurations/AppSettings.cs,**/MediAssist.Dependency/DependencyContainer.cs,**/MediAssist.Infrastructure.HttpProvider/DependencyInjection.cs,**/MediAssist.UI/Models/ErrorViewModel.cs,**/MediAssist.DbContext/FeaturePlanConfiguration.cs,**/MediAssist.DbContext/MediAssistDbContextFactory.cs,**/MediAssist.DbContext/UserConfiguration.cs    
+    # - task: DotNetCoreCLI@2
+    #   displayName: 'Build Solution'
+    #   inputs:
+    #     command: 'build'
+    #     projects: '**/*.csproj'
+    #     arguments: '--configuration $(buildConfiguration) --no-restore'
+ 
+    # - task: SonarQubeAnalyze@4
+    #   displayName: "Run SonarQube Analysis"
+ 
+    # - task: SonarQubePublish@4
+    #   displayName: "Publish SonarQube Results"
+    #   inputs:
+    #     pollingTimeoutSec: '300'
+ 
+    # - task: sonar-buildbreaker@8
+    #   inputs:
+    #     SonarQube: 'Sonarqube-API'
+    #   continueOnError: true
+ 
+  - job: Build
+    displayName: Build
+    pool:
+      name: 'MEDI'
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 5
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK 8.0'
+      inputs:
+        packageType: 'sdk'
+        version: '8.0.x'
+ 
+    - task: Docker@2
+      displayName: 'Build Docker Image for Development'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'build'
+        Dockerfile: 'dockerfile'
+        arguments: '--build-arg ASPNETCORE_ENVIRONMENT=Dev'
+ 
+    - task: Docker@2
+      displayName: 'Push Docker Image to Registry'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'push'
+ 
+    - task: DotNetCoreCLI@2
+      displayName: 'Create tool manifest for EF tools'
+      inputs:
+        command: custom
+        custom: new
+        arguments: 'tool-manifest'
+ 
+    - task: DotNetCoreCLI@2
+      displayName: 'Install .NET EF tools'
+      inputs:
+        command: custom
+        custom: tool
+        arguments: 'install dotnet-ef'
+ 
+    - task: DotNetCoreCLI@2
+      displayName: 'Generate SQL migration script for Staging'
+      inputs:
+        command: custom
+        custom: ef
+        arguments:  'migrations script --output $(Build.SourcesDirectory)/SQL/MediAssistDBScript.sql --idempotent --project $(Build.SourcesDirectory)/MediAssist.DbContext/MediAssist.DbContext.csproj --context MediAssistDbContext'
+      env:
+        SqlConnectionString: $(SqlConnectionString)
+ 
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish SQL Script as Build Artifact'
+      inputs:
+        PathtoPublish: '$(Build.SourcesDirectory)/SQL'
+        ArtifactName: 'MEDI-Frontend-Development'

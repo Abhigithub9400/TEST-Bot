@@ -1,0 +1,107 @@
+trigger: none
+
+schedules:
+- cron: "0 7 * * 1"  # Runs at 7:00 AM every Monday
+  displayName: Weekly Monday builds
+  branches:
+    include:
+      - Auto-Trigger-Buildpipelines
+  always: true
+
+parameters:
+- name: Environment
+  displayName: 'Environment to build'
+  type: string
+  default: 'all'
+  values:
+  - all
+  - development
+  - staging
+  - production
+
+pool:
+  name: 'MEDI'
+
+stages:
+- stage: "Build_Stage"
+  jobs:
+  - job: BuildDevelopment
+    condition: or(eq('${{ parameters.Environment }}', 'all'), eq('${{ parameters.Environment }}', 'development'))
+    variables:
+      - group: api.develop
+    steps:
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'build'
+        Dockerfile: 'dockerfile'
+        tags: |
+          development
+          development-$(Build.BuildId)
+        arguments: '--build-arg ASPNETCORE_ENVIRONMENT=development'
+
+    - task: Docker@2
+      displayName: 'Push Docker Image to Registry'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'push'
+        tags: |
+          development
+          development-$(Build.BuildId)
+
+  - job: BuildStaging
+    condition: or(eq('${{ parameters.Environment }}', 'all'), eq('${{ parameters.Environment }}', 'staging'))
+    variables:
+      - group: api.stage
+    steps:
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'build'
+        Dockerfile: 'dockerfile'
+        tags: |
+          staging
+          staging-$(Build.BuildId)
+        arguments: '--build-arg ASPNETCORE_ENVIRONMENT=staging'
+
+    - task: Docker@2
+      displayName: 'Push Docker Image to Registry'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'push'
+        tags: |
+          staging
+          staging-$(Build.BuildId)
+
+  - job: BuildProduction
+    condition: or(eq('${{ parameters.Environment }}', 'all'), eq('${{ parameters.Environment }}', 'production'))
+    variables:
+      - group: medi-fe-prod
+    steps:
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'build'
+        Dockerfile: 'dockerfile'
+        tags: |
+          production
+          production-$(Build.BuildId)
+        arguments: '--build-arg ASPNETCORE_ENVIRONMENT=production'
+
+    - task: Docker@2
+      displayName: 'Push Docker Image to Registry'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'push'
+        tags: |
+          production
+          production-$(Build.BuildId)

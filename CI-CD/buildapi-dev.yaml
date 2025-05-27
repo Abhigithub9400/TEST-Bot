@@ -1,0 +1,35 @@
+trigger:
+ branches:
+   include:
+     - develop 
+
+
+pool:
+  name: 'MEDI'
+
+variables:
+- group: mediapi-dev
+- name: variableConfiguration
+
+stages:
+- stage: "Build_Stage"
+  jobs:
+  - job: Build
+    displayName: Build
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 5
+    steps:
+     - task: Docker@2
+       inputs:
+         containerRegistry: 'docker _Pits'
+         repository: '$(dockerrepo)'
+         command: 'build'
+         Dockerfile: '$(System.DefaultWorkingDirectory)/MediAssist.API/dockerfile'
+         buildContext: '$(System.DefaultWorkingDirectory)'
+         arguments: '--build-arg ASPNETCORE_ENVIRONMENT=Dev'
+         
+     - task: Docker@2
+       inputs:
+         containerRegistry: 'docker _Pits'
+         repository: '$(dockerrepo)'
+         command: 'push'

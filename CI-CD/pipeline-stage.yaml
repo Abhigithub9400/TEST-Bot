@@ -1,0 +1,90 @@
+trigger:
+  none
+
+pool:
+  name: 'MEDI'
+
+variables:
+- group: api.stage 
+- name: variableConfiguration
+
+stages:
+- stage: "QualityTest"
+  jobs:
+  - job: Scanning
+    displayName: SonarQube
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 5
+    # steps:
+    # - task: SonarQubePrepare@4
+    #   inputs:
+    #     SonarQube: 'Sonarqube-API'
+    #     scannerMode: 'CLI'
+    #     configMode: 'manual'
+    #     cliProjectKey: 'MEDI-FE'
+    #     cliProjectName: 'MEDI-FE'
+    #     cliSources: '.'
+
+    # - task: SonarQubeAnalyze@4
+
+    # - task: SonarQubePublish@4
+    #   inputs:
+    #     pollingTimeoutSec: '300'
+
+- stage: "Build_Stage"
+  jobs:
+  - job: Build
+    displayName: Build
+    timeoutInMinutes: 360
+    cancelTimeoutInMinutes: 5
+    steps:
+    - task: UseDotNet@2
+      displayName: 'Install .NET SDK 8.0'
+      inputs:
+        packageType: 'sdk'
+        version: '8.0.x'
+
+    - task: Docker@2
+      displayName: 'Build Docker Image for Staging'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'build'
+        Dockerfile: 'dockerfile'
+        arguments: '--build-arg ASPNETCORE_ENVIRONMENT=Staging'
+
+    - task: Docker@2
+      displayName: 'Push Docker Image to Registry'
+      inputs:
+        containerRegistry: 'docker _Pits'
+        repository: '$(dockerrepo)'
+        command: 'push'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Create tool manifest for EF tools'
+      inputs:
+        command: custom
+        custom: new
+        arguments: 'tool-manifest'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Install .NET EF tools'
+      inputs:
+        command: custom
+        custom: tool
+        arguments: 'install dotnet-ef'
+
+    - task: DotNetCoreCLI@2
+      displayName: 'Generate SQL migration script for Staging'
+      inputs:
+        command: custom
+        custom: ef
+        arguments: 'migrations script --output $(Build.SourcesDirectory)/SQL/MediAssistDBScript.sql --idempotent --project $(Build.SourcesDirectory)/MediAssist.DbContext/MediAssist.DbContext.csproj --context MediAssistDbContext'
+      env:
+        SqlConnectionString: $(SqlConnectionString) # Pass the connection string as an environment variable
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish SQL Script as Build Artifact'
+      inputs:
+        PathtoPublish: '$(Build.SourcesDirectory)/SQL'
+        ArtifactName: 'MEDI-Frontend-Staging'
